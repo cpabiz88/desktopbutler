@@ -1,0 +1,102 @@
+# КОРНЕВЫЕ ПАПКИ И ПУТИ
+
+root_cleanup_dir: "D:/Проекты/DesktopButler/Desktop_Cleanup"   # Куда складывать датированные папки уборок; используйте прямые слеши или "~" для кроссплатформенности [Windows/Linux]
+desktop_dir: "~/Desktop"                                       # Путь к Рабочему столу; "~" автоматически разворачивается в текущий профиль пользователя на обеих ОС
+log_dir: "D:/Проекты/DesktopButler/logs"                       # Папка логов; хранит .log с операциями перемещений/удалений и сообщениями
+sessions_dir: "D:/Проекты/DesktopButler/sessions"                     # Папка сессий; JSON-журналы для отката (undo-last) последней уборки
+model_path: "D:/Проекты/DesktopButler/model/importance_model.joblib"        # Путь к ML‑модели важности (Naive Bayes), подключается после обучения
+
+# БАЗОВЫЕ ПЕРЕКЛЮЧАТЕЛИ БЕЗОПАСНОСТИ И ПОВЕДЕНИЯ
+
+dry_run: false                      # true: только лог, без перемещений/удалений (рекомендуется для первичной проверки); false: применяются реальные действия
+use_ml_importance: false           # true: включить ML‑определение важности после обучения; до обучения оставить false
+quarantine_days: 14                # Срок хранения в карантине для отложенного удаления (если включите такую стратегию в код)
+stable_check_attempts: 3           # Сколько раз проверять стабильность размера файла перед переносом (защита от недозагрузок и записей)
+stable_check_interval_sec: 1.0     # Интервал между проверками размера в секундах (баланс точности и скорости для больших файлов)
+
+# ПРАВИЛА ВАЖНОСТИ (БЕЗ ML)
+
+importance_rules:
+  high_keywords: ["!", "договор", "счет", "invoice", "контракт", "отчет", "presentation", "отгрузка", "акты"]  # Ключевые слова в имени для пометки "важно"
+  low_keywords: ["скриншот", "screenshot", "copy", "temp", "draft", "final_final2", "новая папка", "новый текстовый документ"]   # Ключевые слова для пометки "неважно" (ниже приоритета)
+  min_size_bytes_for_high: 200000    # Порог размера (байты), выше которого файл скорее важен (регулируйте под ваши типы файлов)
+  recent_days_for_high: 7            # Считаем "важным" всё, что изменялось за последние N дней (защита от убирания свежей работы)
+
+# БАЗОВЫЕ ИСКЛЮЧЕНИЯ
+
+exclusions:
+  names: [".DS_Store", "Thumbs.db", "desktop.ini"]  # Системные "мусорные" файлы, всегда пропускаются обработчиком
+  patterns: []                       # Доп. маски для исключений (fnmatch), применяются к полному POSIX‑пути и имени
+  inside_cleanup_root: true          # Защита от рекурсии: не обрабатывать файлы уже внутри root_cleanup_dir
+
+# ОБРАБОТКА ДИРЕКТОРИЙ
+
+folders:
+  handle: "atomic"                 # "atomic" — обрабатывать папки как целое; "ignore" — не трогать директории [без разборки]
+  quiet_period_sec: 30             # Секунды “тишины” без изменений перед действием с каталогом (стабилизация)
+  delete_empty_folders: true       # Пустые папки удалять (если не в blacklist), иначе — пропускать
+
+  compress:
+    enabled: true                       # При true — упаковывать каталог в ZIP вместо перемещения папки
+    method: "ZIP_DEFLATED"              # ZIP_STORED | ZIP_DEFLATED | ZIP_BZIP2 | ZIP_LZMA (метод сжатия)
+    level: 6                            # Уровень: DEFLATED 0–9, BZIP2 1–9; STORED/LZMA — параметр игнорируется библиотекой 
+    remove_original_after_zip: true    # Удалять исходную папку после успешной упаковки (рекомендуется оставить false для проверки)
+
+  category_name: "folders"         # Категория для директорий/архивов: Desktop_Cleanup_YYYY-MM-DD/.../folders
+
+# ЧЕРНЫЙ СПИСОК (НИКОГДА НЕ ТРОГАТЬ)
+# ПРИМЕЧАНИЕ: на Windows сопоставление fnmatch обычно регистронезависимо, а в Linux — регистрозависимо; учитывайте регистр в шаблонах под Linux
+
+blacklist:
+  names: ["DO_NOT_TOUCH.txt", "ВАЖНОЕ.lnk", "ВАЖНОЕ.lnk", "Дела.txt", "Глонасс.txt", "Может быть, когда нибудь.txt", "МБКН.txt"]        # Точные имена в корне рабочего стола, которые нельзя трогать
+  extensions: ["lnk"]                              # Расширения "вне закона" (ярлыки и т.п.), не перемещать вовсе
+  exact_paths:                                     # Точные абсолютные пути к файлам (используйте "~" и прямые слеши для переносимости)
+    - "C:/Users/oes/Desktop/Мой проект/README.md"
+  dirs:                                            # Полные пути к папкам, всё содержимое которых игнорируется (важне рабочие папки на десктопе)
+    - "C:/Users/oes/Desktop/Актуальное"
+    - "C:/Users/oes/Desktop/Всякое"
+    - "C:/Users/oes/Desktop/Deskcretary"
+  patterns:                                        # Маски fnmatch (Unix‑стиль), проверяются по полному POSIX‑пути и имени файла
+    - "*.lock"
+    - "*_DO_NOT_TOUCH.*"
+    - "C:/Users/oes/Desktop/ВАЖНО/*"
+    
+# КАТЕГОРИИ (РАЗНОС ПО ПАПКАМ ПО РАСШИРЕНИЯМ)
+
+categories:
+  documents:       # Тексты/документы: офисные и универсальные форматы
+    [pdf, txt, rtf, md, markdown, doc, docx, odt, tex, epub, mobi, djvu]
+  spreadsheets:    # Таблицы/данные в табличном виде
+    [csv, tsv, xls, xlsx, ods]
+  presentations:   # Презентации и слайды
+    [ppt, pptx, key, odp]
+  images:          # Растровая/векторная графика для веб/офиса
+    [jpg, jpeg, png, webp, gif, bmp, tif, tiff, svg, heif, heic]
+  design:          # Проф. дизайн/издательские форматы
+    [psd, ai, eps, indd, xd, fig, sketch]
+  video:           # Видео форматы (универсальный набор)
+    [mp4, mov, avi, mkv, mpeg, mpg, m4v, webm, wmv]
+  audio:           # Аудиоформаты (универсальный набор)
+    [mp3, wav, flac, m4a, aac, ogg, wma, aiff, aif]
+  archives:        # Архивы/сжатые контейнеры
+    [zip, rar, 7z, tar, gz, bz2, xz, zst, cab]
+  disk_images:     # Образы дисков/инсталляторы‑образы
+    [iso, img, vhd, vhdx, dmg]
+  apps:            # Исполняемые/установщики/скриптовые лончеры (внимание: потенциально опасные)
+    [exe, msi, bat, cmd, com, scr, reg, vbs, wsf, ps1]
+  code:            # Исходники, скрипты, конфиги разработки и DevOps
+    [py, pyw, ipynb, js, mjs, cjs, ts, tsx, jsx,
+     html, htm, css, scss, less,
+     json, jsonl, yaml, yml, xml, ini, cfg, env,
+     php, phtml, phar,
+     sh, bash, zsh, ps1, psd1, psm1,
+     c, h, cpp, hpp, cs, java, kt, go, rs, rb, pl, lua, r, m, swift, dart]
+  data:            # Данные и БД: локальные базы, колоночные форматы, аналитические контейнеры
+    [sql, sqlite, db, db3, mdb, accdb, parquet, avro, orc, feather, arrow]
+  fonts:           # Шрифты для систем/веб
+    [ttf, otf, woff, woff2, eot]
+  cad:             # CAD/3D чертежи и модели
+    [dwg, dxf, stl, step, stp, iges, igs, obj, fbx]
+  shortcuts:       # Ярлыки и интернет‑ссылки
+    [lnk, url]
+  other: []        # Прочее: всё, что не попало в списки выше

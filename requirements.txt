@@ -1,0 +1,4 @@
+﻿watchdog>=4.0.0
+PyYAML>=6.0.2
+scikit-learn>=1.4.0
+joblib>=1.4.2
